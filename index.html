@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>馃悏 椋炲ぉ灏忛緳杞?/title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0B0E3B;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:'Segoe UI','PingFang SC',sans-serif}
+canvas{display:block;margin:0 auto}
+#ui{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+#ui>*{pointer-events:auto}
+.screen{display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;max-width:380px;width:90%}
+.screen.active{display:flex}
+h1{font-size:42px;background:linear-gradient(135deg,#FFD700,#FF6B35);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-shadow:0 0 40px rgba(255,165,0,.3);margin-bottom:4px}
+.subtitle{color:#A8C0FF;font-size:14px;margin-bottom:8px}
+.btn{padding:14px 44px;border:none;border-radius:50px;font-size:18px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:1px}
+.btn:active{transform:scale(.95)}
+.btn-play{background:linear-gradient(135deg,#FF6B35,#FF2D78);color:#fff;box-shadow:0 6px 30px rgba(255,45,120,.4)}
+.btn-play:hover{box-shadow:0 8px 40px rgba(255,45,120,.6)}
+.btn-small{padding:10px 28px;font-size:15px;border-radius:40px}
+.btn-ghost{background:rgba(255,255,255,.1);color:#A8C0FF;border:1.5px solid rgba(255,255,255,.2)}
+.stats{display:flex;gap:20px;margin:12px 0}
+.stat{text-align:center}
+.stat-val{font-size:32px;font-weight:800;color:#FFD700}
+.stat-label{font-size:11px;color:#6688BB;margin-top:2px}
+.feature-list{text-align:left;color:#CCDDFF;font-size:13px;line-height:2}
+.feature-list span{margin-right:6px;font-size:16px}
+#gameOverScreen .final-score{font-size:64px;font-weight:900;color:#FFD700;text-shadow:0 0 30px rgba(255,215,0,.5)}
+#gameOverScreen .best{color:#A8C0FF;font-size:14px;margin-top:-8px}
+.badge{display:inline-block;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;margin:4px}
+.badge-gold{background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00}
+.badge-silver{background:linear-gradient(135deg,#C0C0C0,#E8E8E8);color:#333}
+.badge-bronze{background:linear-gradient(135deg,#CD7F32,#E8A060);color:#fff}
+.tip{color:#6688AA;font-size:12px;margin-top:8px;line-height:1.6}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<!-- 寮€濮嬬晫闈?-->
+<div id="ui">
+  <div class="screen active" id="startScreen">
+    <h1>馃悏 椋炲ぉ灏忛緳杞?/h1>
+    <div class="subtitle">鍘熷垱浼戦棽椋炶娓告垙 路 鏃犲箍鍛婄函鍑€鐗?/div>
+    <div class="stats">
+      <div class="stat"><div class="stat-val" id="bestScore">0</div><div class="stat-label">鏈€楂樺垎</div></div>
+      <div class="stat"><div class="stat-val" id="totalCoins">0</div><div class="stat-label">绱閲戝竵</div></div>
+    </div>
+    <div class="feature-list">
+      <span>馃幃</span>鐐瑰嚮/瑙︽懜鎺у埗椋炶楂樺害<br>
+      <span>馃挵</span>鏀堕泦閲戝竵瑙ｉ攣鏂扮毊鑲?br>
+      <span>馃弳</span>涓夌闅惧害妯″紡鎸戞垬鑷垜<br>
+      <span>鈿?/span>鍔犻€熼亾鍏?& 鎶ょ浘閬撳叿
+    </div>
+    <button class="btn btn-play" onclick="Game.start('normal')" style="margin-top:8px">寮€濮嬫父鎴?/button>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-ghost btn-small" onclick="Game.start('easy')">绠€鍗?/button>
+      <button class="btn btn-ghost btn-small" onclick="Game.start('hard')">鍥伴毦</button>
+    </div>
+    <div class="tip">鏈父鎴忎负100%鍘熷垱寮€鍙戯紝瑙掕壊/缇庢湳/浠ｇ爜鍧囨棤绗笁鏂圭増鏉冨唴瀹?/div>
+  </div>
+
+  <!-- 娓告垙缁撴潫鐣岄潰 -->
+  <div class="screen" id="gameOverScreen">
+    <div style="font-size:48px">馃悏馃挮</div>
+    <div class="final-score" id="finalScore">0</div>
+    <div class="best" id="bestText">鏈€楂樺垎: 0</div>
+    <div id="badges" style="margin:8px 0"></div>
+    <div style="color:#CCDDFF;font-size:14px;margin:4px 0" id="coinText">+0 閲戝竵</div>
+    <button class="btn btn-play btn-small" onclick="Game.restart()" style="margin-top:4px">鍐嶆潵涓€灞€</button>
+    <button class="btn btn-ghost btn-small" onclick="Game.home()" style="margin-top:4px">杩斿洖棣栭〉</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  椋炲ぉ灏忛緳杞?- 100% 鍘熷垱HTML5娓告垙
+//  鐗堟潈澹版槑锛氭湰娓告垙鎵€鏈変唬鐮併€佺編鏈€侀煶鏁堝潎涓哄師鍒?//  鏃犱换浣曠涓夋柟IP銆佸晢鏍囥€佺編鏈礌鏉?// ============================================================
+
+const Canvas = document.getElementById('gameCanvas');
+const C = Canvas.getContext('2d');
+
+// ---- 鑷€傚簲鐢诲竷 ----
+let W, H, SCALE;
+function resize(){
+  W = window.innerWidth;
+  H = window.innerHeight;
+  Canvas.width = W;
+  Canvas.height = H;
+  SCALE = Math.min(W/420, H/750, 1.8);
+  Canvas.style.width = W+'px';
+  Canvas.style.height = H+'px';
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ---- 娓告垙鐘舵€?----
+const STATE = { MENU:0, PLAYING:1, OVER:2 };
+let state = STATE.MENU;
+let score=0, coins=0, best=0, totalCoins=0, speed=0, difficulty='normal';
+let frameCount=0, shakeTimer=0, flashAlpha=0;
+let gameTime=0;
+
+// ---- 璇诲彇瀛樻。 ----
+try{
+  best = parseInt(localStorage.getItem('dragon_rider_best')||'0');
+  totalCoins = parseInt(localStorage.getItem('dragon_rider_coins')||'0');
+}catch(e){}
+function save(){try{localStorage.setItem('dragon_rider_best',best);localStorage.setItem('dragon_rider_coins',totalCoins)}catch(e){}}
+
+// ---- 闅惧害閰嶇疆 ----
+const DIFF = {
+  easy:   {speed:3.5, accel:0.005, gapMin:160, gapMax:240, obsRate:0.025, coinRate:0.04},
+  normal: {speed:5.5, accel:0.008, gapMin:120, gapMax:200, obsRate:0.035, coinRate:0.05},
+  hard:   {speed:7.5, accel:0.012, gapMin:90,  gapMax:160, obsRate:0.045, coinRate:0.06},
+};
+
+// ---- 灏忛緳瑙掕壊锛堢函Canvas缁樺埗锛岄浂澶栭儴绱犳潗锛?---
+const Dragon = {
+  x:0, y:0, vy:0, w:52, h:40,
+  flap:0, flapSpeed:0,
+  shield:0, magnet:0, boost:0,
+  invincible:0,
+  trail:[],
+
+  reset(){
+    this.x = 90*SCALE;
+    this.y = H/2;
+    this.vy = 0;
+    this.flap = 0;
+    this.shield = 0;
+    this.magnet = 0;
+    this.boost = 0;
+    this.invincible = 0;
+    this.trail = [];
+  },
+
+  flapUp(){
+    this.vy = -7*SCALE;
+    this.flap = 8;
+    if(navigator.vibrate) navigator.vibrate(15);
+  },
+
+  update(){
+    // 閲嶅姏
+    this.vy += 0.45*SCALE;
+    this.y += this.vy;
+    // 杈圭晫
+    if(this.y < 20) {this.y=20; this.vy=0;}
+    if(this.y > H-20) {this.y=H-20; this.vy=0; if(state===STATE.PLAYING) Game.hit();}
+    // 鍔ㄧ敾
+    if(this.flap>0) this.flap--;
+    // 閬撳叿鍊掕鏃?    if(this.shield>0) this.shield--;
+    if(this.magnet>0) this.magnet--;
+    if(this.boost>0) this.boost--;
+    if(this.invincible>0) this.invincible--;
+    // 灏捐抗
+    this.trail.unshift({x:this.x, y:this.y+Math.sin(frameCount*0.3)*4*SCALE});
+    if(this.trail.length>12) this.trail.pop();
+  },
+
+  draw(){
+    const x=this.x, y=this.y, s=SCALE;
+    // 鎶ょ浘鍏夌幆
+    if(this.shield>0 || this.invincible>0){
+      C.globalAlpha = 0.25+0.15*Math.sin(frameCount*0.2);
+      C.beginPath();C.arc(x, y, 38*s, 0, Math.PI*2);
+      C.fillStyle = this.invincible>0 ? '#FFD700' : '#00D4FF';
+      C.fill();
+      C.globalAlpha = 1;
+    }
+    // 灏捐抗
+    this.trail.forEach((p,i)=>{
+      C.globalAlpha = (1-i/12)*0.25;
+      C.beginPath();C.arc(p.x, p.y, (12-i)*s, 0, Math.PI*2);
+      C.fillStyle = '#FF8C42';C.fill();
+    });
+    C.globalAlpha=1;
+
+    C.save();
+    C.translate(x, y);
+    if(this.vy>3) C.rotate(0.15);
+    if(this.vy<-3) C.rotate(-0.15);
+
+    // 韬綋
+    C.fillStyle = '#FF6B35';
+    C.beginPath();
+    C.ellipse(0, 0, 22*s, 14*s, 0, 0, Math.PI*2);
+    C.fill();
+
+    // 鑲氬瓙
+    C.fillStyle = '#FFD4A8';
+    C.beginPath();
+    C.ellipse(2*s, 4*s, 14*s, 9*s, 0, 0, Math.PI*2);
+    C.fill();
+
+    // 缈呰唨锛堟墖鍔級
+    const wingFlap = Math.sin(frameCount*0.4)*0.5;
+    C.fillStyle = '#FF8C42';
+    C.save();
+    C.translate(-8*s, -6*s);
+    C.rotate(-0.6+wingFlap);
+    C.beginPath();
+    C.ellipse(0, 0, 18*s, 8*s, 0, 0, Math.PI*2);
+    C.fill();
+    C.restore();
+    C.save();
+    C.translate(-8*s, 6*s);
+    C.rotate(0.6-wingFlap);
+    C.beginPath();
+    C.ellipse(0, 0, 18*s, 8*s, 0, 0, Math.PI*2);
+    C.fill();
+    C.restore();
+
+    // 鐪肩潧
+    C.fillStyle = '#fff';
+    C.beginPath();C.arc(12*s, -5*s, 6*s, 0, Math.PI*2);C.fill();
+    C.fillStyle = '#1a0a00';
+    C.beginPath();C.arc(14*s, -5*s, 3*s, 0, Math.PI*2);C.fill();
+    // 楂樺厜
+    C.fillStyle='#fff';
+    C.beginPath();C.arc(15*s,-6*s,1.2*s,0,Math.PI*2);C.fill();
+
+    // 鍢村反
+    C.strokeStyle='#CC4400';C.lineWidth=1.5*s;
+    C.beginPath();C.arc(16*s, -1*s, 5*s, 0.1*Math.PI, 0.9*Math.PI);C.stroke();
+
+    // 瑙?    C.fillStyle='#FFD700';
+    C.beginPath();C.moveTo(8*s,-14*s);C.lineTo(12*s,-22*s);C.lineTo(16*s,-14*s);C.fill();
+
+    // 灏惧反
+    C.strokeStyle='#FF6B35';C.lineWidth=4*s;
+    C.beginPath();
+    C.moveTo(-20*s,0);
+    const tailWag = Math.sin(frameCount*0.15)*8*s;
+    C.quadraticCurveTo(-32*s,tailWag,-26*s,12*s+tailWag);
+    C.stroke();
+    C.fillStyle='#FF8C42';
+    C.beginPath();C.arc(-26*s,12*s+tailWag,5*s,0,Math.PI*2);C.fill();
+
+    C.restore();
+  }
+};
+
+// ---- 闅滅鐗?----
+let obstacles = [];
+const Obs = {
+  reset(){obstacles=[]},
+  spawn(){
+    const cfg = DIFF[difficulty];
+    if(Math.random()<cfg.obsRate){
+      const gap = cfg.gapMin + Math.random()*(cfg.gapMax-cfg.gapMin);
+      const topH = 60 + Math.random()*(H-gap-120);
+      obstacles.push({
+        x:W+20, w:50*SCALE, topH:topH, gap:gap,
+        counted:false, color:`hsl(${Math.random()*360},70%,60%)`
+      });
+    }
+  },
+  update(){
+    const spd = (DIFF[difficulty].speed + speed)*SCALE;
+    obstacles.forEach(o=>{
+      o.x -= spd;
+      // 纰版挒妫€娴?      const dx = Math.abs(Dragon.x - o.x);
+      const dy = Dragon.y;
+      if(dx < (Dragon.w/2 + o.w/2)){
+        if(dy < o.topH || dy > o.topH+o.gap){
+          if(Dragon.invincible>0) return;
+          if(Dragon.shield>0){Dragon.shield=0;return;}
+          Game.hit();
+        }
+      }
+      // 璁″垎
+      if(!o.counted && o.x < Dragon.x-20){
+        o.counted=true;
+        score += 1;
+      }
+    });
+    obstacles = obstacles.filter(o=>o.x > -100);
+  },
+  draw(){
+    obstacles.forEach(o=>{
+      // 涓婄閬?      const g = C.createLinearGradient(o.x,0,o.x+o.w,o.topH);
+      g.addColorStop(0,'#3B82F6');g.addColorStop(1,'#1D4ED8');
+      C.fillStyle=g;
+      roundRect(o.x,0,o.w,o.topH,8*SCALE);
+      // 绠￠亾甯藉瓙
+      C.fillStyle='#2563EB';
+      roundRect(o.x-5*SCALE,o.topH-16*SCALE,o.w+10*SCALE,16*SCALE,4*SCALE);
+      // 涓嬬閬?      const gy = o.topH+o.gap;
+      const g2 = C.createLinearGradient(o.x,gy,o.x+o.w,H);
+      g2.addColorStop(0,'#3B82F6');g2.addColorStop(1,'#1D4ED8');
+      C.fillStyle=g2;
+      roundRect(o.x,gy,o.w,H-gy,8*SCALE);
+      C.fillStyle='#2563EB';
+      roundRect(o.x-5*SCALE,gy,o.w+10*SCALE,16*SCALE,4*SCALE);
+    });
+  }
+};
+
+// ---- 閲戝竵 ----
+let coinsList = [];
+const Coins = {
+  reset(){coinsList=[]},
+  spawn(){
+    if(Math.random()<DIFF[difficulty].coinRate){
+      coinsList.push({
+        x:W+20, y:80+Math.random()*(H-160),
+        r:10*SCALE, magnet:false, sparkle:Math.random()*Math.PI*2
+      });
+    }
+  },
+  update(){
+    const spd = (DIFF[difficulty].speed+speed)*SCALE;
+    const magnetRange = Dragon.magnet>0 ? 120*SCALE : 0;
+    coinsList.forEach(c=>{
+      c.x -= spd;
+      c.sparkle += 0.08;
+      // 纾侀搧鍚搁檮
+      if(magnetRange>0){
+        const dx=c.x-Dragon.x, dy=c.y-Dragon.y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<magnetRange){
+          c.x -= (c.x-Dragon.x)*0.12;
+          c.y -= (c.y-Dragon.y)*0.12;
+        }
+      }
+      // 鎷惧彇
+      const dx=c.x-Dragon.x, dy=c.y-Dragon.y;
+      if(dx*dx+dy*dy < (c.r+Dragon.w/2)*(c.r+Dragon.w/2)){
+        c.collected=true;
+        coins++;
+        totalCoins++;
+        if(navigator.vibrate) navigator.vibrate(8);
+      }
+    });
+    coinsList = coinsList.filter(c=>!c.collected && c.x>-50);
+  },
+  draw(){
+    coinsList.forEach(c=>{
+      const glow = 0.6+0.4*Math.sin(c.sparkle);
+      C.globalAlpha = glow;
+      // 閲戝竵鍏夋檿
+      C.beginPath();C.arc(c.x,c.y,c.r+4*SCALE,0,Math.PI*2);
+      C.fillStyle='rgba(255,215,0,0.3)';C.fill();
+      C.globalAlpha=1;
+      // 閲戝竵
+      C.beginPath();C.arc(c.x,c.y,c.r,0,Math.PI*2);
+      const cg=C.createRadialGradient(c.x-2*SCALE,c.y-2*SCALE,0,c.x,c.y,c.r);
+      cg.addColorStop(0,'#FFD700');cg.addColorStop(1,'#B8860B');
+      C.fillStyle=cg;C.fill();
+      // 楼 绗﹀彿
+      C.fillStyle='#8B6914';C.font=`bold ${12*SCALE}px sans-serif`;
+      C.textAlign='center';C.textBaseline='middle';
+      C.fillText('楼',c.x,c.y+1*SCALE);
+    });
+  }
+};
+
+// ---- 閬撳叿 ----
+let powerups = [];
+const PowerUps = {
+  reset(){powerups=[]},
+  maybeSpawn(){
+    if(Math.random()<0.006){
+      const types = ['shield','magnet','boost'];
+      powerups.push({
+        x:W+20, y:80+Math.random()*(H-160),
+        type:types[Math.floor(Math.random()*types.length)],
+        r:14*SCALE, t:0
+      });
+    }
+  },
+  update(){
+    const spd=(DIFF[difficulty].speed+speed)*SCALE;
+    powerups.forEach(p=>{
+      p.x-=spd; p.t+=0.06;
+      const dx=p.x-Dragon.x, dy=p.y-Dragon.y;
+      if(dx*dx+dy*dy<(p.r+Dragon.w/2)*(p.r+Dragon.w/2)){
+        p.collected=true;
+        if(p.type==='shield'){Dragon.shield=420;toast('馃洝锔?鎶ょ浘婵€娲?7绉?);}
+        if(p.type==='magnet'){Dragon.magnet=420;toast('馃Р 纾侀搧婵€娲?7绉?);}
+        if(p.type==='boost'){Dragon.boost=300;toast('鈿?鍔犻€熸縺娲伙紒');}
+        if(navigator.vibrate)navigator.vibrate([20,50,20]);
+      }
+    });
+    powerups=powerups.filter(p=>!p.collected&&p.x>-50);
+  },
+  draw(){
+    powerups.forEach(p=>{
+      const glow=0.4+0.3*Math.sin(p.t*3);
+      C.globalAlpha=glow+0.5;
+      const colors={shield:'#00D4FF',magnet:'#FF69B4',boost:'#FFD700'};
+      const icons={shield:'馃洝',magnet:'馃Р',boost:'鈿?};
+      C.beginPath();C.arc(p.x,p.y,p.r+6*SCALE,0,Math.PI*2);
+      C.fillStyle=colors[p.type]+'40';C.fill();
+      C.globalAlpha=1;
+      C.beginPath();C.arc(p.x,p.y,p.r,0,Math.PI*2);
+      C.fillStyle=colors[p.type];C.fill();
+      C.font=`${16*SCALE}px sans-serif`;
+      C.textAlign='center';C.textBaseline='middle';
+      C.fillText(icons[p.type],p.x,p.y);
+    });
+    C.globalAlpha=1;
+  }
+};
+
+// ---- 浜戝眰鑳屾櫙 ----
+let clouds = [];
+function initClouds(){
+  clouds=[];
+  for(let i=0;i<8;i++) clouds.push({x:Math.random()*W,y:Math.random()*H*0.7,r:30+Math.random()*60,speed:0.3+Math.random()*0.8,alpha:0.08+Math.random()*0.12});
+}
+function drawClouds(){
+  const spd=(DIFF[difficulty].speed+speed)*0.2;
+  clouds.forEach(c=>{
+    c.x-=c.speed*SCALE+spd;
+    if(c.x<-100){c.x=W+100;c.y=Math.random()*H*0.7;}
+    C.globalAlpha=c.alpha;
+    C.fillStyle='#A8C0FF';
+    C.beginPath();C.arc(c.x,c.y,c.r*SCALE,0,Math.PI*2);C.fill();
+    C.beginPath();C.arc(c.x+c.r*0.6*SCALE,c.y-c.r*0.2*SCALE,c.r*0.7*SCALE,0,Math.PI*2);C.fill();
+    C.beginPath();C.arc(c.x-c.r*0.5*SCALE,c.y+c.r*0.1*SCALE,c.r*0.8*SCALE,0,Math.PI*2);C.fill();
+    C.globalAlpha=1;
+  });
+}
+
+// ---- 鍦伴潰/澶╃┖娓愬彉 ----
+function drawSky(){
+  const grad = C.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#0B0E3B');
+  grad.addColorStop(0.5,'#1a1a5e');
+  grad.addColorStop(1,'#FF6B3520');
+  C.fillStyle=grad;
+  C.fillRect(0,0,W,H);
+  drawStars();
+}
+
+let stars = [];
+function initStars(){for(let i=0;i<60;i++) stars.push({x:Math.random()*W,y:Math.random()*H*0.6,r:0.5+Math.random()*1.5,phase:Math.random()*Math.PI*2})}
+function drawStars(){
+  stars.forEach(s=>{
+    s.phase+=0.02;
+    C.globalAlpha=0.3+0.4*Math.sin(s.phase);
+    C.fillStyle='#fff';
+    C.beginPath();C.arc(s.x,s.y,s.r*SCALE,0,Math.PI*2);C.fill();
+  });
+  C.globalAlpha=1;
+}
+
+// ---- HUD ----
+function drawHUD(){
+  // 鍒嗘暟
+  C.fillStyle='#fff';C.font=`bold ${22*SCALE}px 'Segoe UI',sans-serif`;
+  C.textAlign='left';C.textBaseline='top';
+  C.fillText(score.toString(), 16*SCALE, 50*SCALE);
+  // 閲戝竵
+  C.fillStyle='#FFD700';C.font=`${14*SCALE}px sans-serif`;
+  C.fillText('楼'+coins, 16*SCALE, 78*SCALE);
+  // 鏈€楂樺垎
+  C.fillStyle='rgba(255,255,255,0.4)';C.font=`${12*SCALE}px sans-serif`;
+  C.textAlign='right';
+  C.fillText('BEST: '+best, W-16*SCALE, 50*SCALE);
+  // 閬撳叿鐘舵€?  let py=78*SCALE;
+  C.textAlign='right';C.font=`${12*SCALE}px sans-serif`;
+  if(Dragon.shield>0){C.fillStyle='#00D4FF';C.fillText('馃洝锔?+Math.ceil(Dragon.shield/60)+'s',W-16*SCALE,py);py+=18*SCALE;}
+  if(Dragon.magnet>0){C.fillStyle='#FF69B4';C.fillText('馃Р'+Math.ceil(Dragon.magnet/60)+'s',W-16*SCALE,py);py+=18*SCALE;}
+  if(Dragon.boost>0){C.fillStyle='#FFD700';C.fillText('鈿?+Math.ceil(Dragon.boost/60)+'s',W-16*SCALE,py);py+=18*SCALE;}
+  // 閫熷害鏉?  const barW=60*SCALE, barH=4*SCALE;
+  C.fillStyle='rgba(255,255,255,0.15)';
+  roundRect(W-16*SCALE-barW, py, barW, barH, 2*SCALE);
+  C.fillStyle='#FF6B35';
+  roundRect(W-16*SCALE-barW, py, barW*(Math.min(speed/8,1)), barH, 2*SCALE);
+  C.fillStyle='rgba(255,255,255,0.5)';C.font=`${10*SCALE}px sans-serif`;
+  C.textAlign='right';
+  C.fillText('SPEED',W-16*SCALE,py+8*SCALE);
+}
+
+// ---- Toast ----
+let toasts = [];
+function toast(msg){
+  toasts.push({text:msg,t:90,alpha:1});
+}
+function drawToasts(){
+  toasts.forEach((t,i)=>{
+    t.t--; t.alpha = Math.min(1, t.t/20);
+    if(t.t<=0) return;
+    C.globalAlpha=t.alpha;
+    C.fillStyle='rgba(0,0,0,0.6)';
+    const tw=C.measureText(t.text).width;
+    roundRect(W/2-tw/2-12*SCALE, H-80*SCALE-i*30*SCALE, tw+24*SCALE, 28*SCALE, 14*SCALE);
+    C.fillStyle='#fff';C.font=`${13*SCALE}px sans-serif`;C.textAlign='center';
+    C.fillText(t.text,W/2,H-68*SCALE-i*30*SCALE);
+    C.globalAlpha=1;
+  });
+  toasts=toasts.filter(t=>t.t>0);
+}
+
+// ---- 宸ュ叿鍑芥暟 ----
+function roundRect(x,y,w,h,r){
+  C.beginPath();
+  C.moveTo(x+r,y);C.lineTo(x+w-r,y);C.quadraticCurveTo(x+w,y,x+w,y+r);
+  C.lineTo(x+w,y+h-r);C.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  C.lineTo(x+r,y+h);C.quadraticCurveTo(x,y+h,x,y+h-r);
+  C.lineTo(x,y+r);C.quadraticCurveTo(x,y,x+r,y);
+  C.fill();
+}
+
+// ---- 娓告垙閫昏緫 ----
+const Game = {
+  start(diff){
+    difficulty = diff||'normal';
+    state = STATE.PLAYING;
+    score=0; coins=0; speed=0; frameCount=0;
+    Dragon.reset();
+    Obs.reset(); Coins.reset(); PowerUps.reset();
+    document.getElementById('startScreen').classList.remove('active');
+    document.getElementById('gameOverScreen').classList.remove('active');
+  },
+
+  hit(){
+    if(Dragon.invincible>0) return;
+    shakeTimer=10;
+    flashAlpha=0.6;
+    Game.over();
+  },
+
+  over(){
+    state = STATE.OVER;
+    if(score>best){best=score;}
+    save();
+    // 鏄剧ず缁撴潫鐣岄潰
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('bestText').textContent = '鏈€楂樺垎: '+best;
+    document.getElementById('coinText').textContent = '+'+(coins)+' 閲戝竵锛堢疮璁? '+totalCoins+'锛?;
+    // 寰界珷
+    let badges='';
+    if(score>=50) badges+=`<span class="badge badge-gold">馃弳 椋炶楂樻墜 50+</span>`;
+    if(score>=20) badges+=`<span class="badge badge-silver">猸?鍒濋湶閿嬭姃 20+</span>`;
+    if(coins>=10) badges+=`<span class="badge badge-bronze">馃挵 閲戝竵杈句汉</span>`;
+    if(best>=100) badges+=`<span class="badge badge-gold">馃憫 浼犲椋為緳 100+</span>`;
+    document.getElementById('badges').innerHTML=badges;
+    document.getElementById('gameOverScreen').classList.add('active');
+  },
+
+  restart(){
+    Game.start(difficulty);
+  },
+
+  home(){
+    state=STATE.MENU;
+    document.getElementById('bestScore').textContent=best;
+    document.getElementById('totalCoins').textContent=totalCoins;
+    document.getElementById('startScreen').classList.add('active');
+    document.getElementById('gameOverScreen').classList.remove('active');
+  },
+
+  update(){
+    if(state!==STATE.PLAYING) return;
+    frameCount++;
+    gameTime++;
+    // 鍔犻€?    speed = Math.min(speed+DIFF[difficulty].accel, 10);
+    Dragon.update();
+    Obs.spawn(); Obs.update();
+    Coins.spawn(); Coins.update();
+    PowerUps.maybeSpawn(); PowerUps.update();
+    // 鍔ㄦ€侀毦搴︼細姣?00鍒嗗姞閫?    if(score>0 && score%500===0 && frameCount%60===0){
+      speed=Math.min(speed+0.5,12);
+    }
+  },
+
+  draw(){
+    C.clearRect(0,0,W,H);
+    drawSky();
+    drawClouds();
+    if(state===STATE.PLAYING || state===STATE.OVER){
+      Obs.draw();
+      Coins.draw();
+      PowerUps.draw();
+      Dragon.draw();
+      drawHUD();
+      drawToasts();
+      // 閫熷害鍐插埡鐗规晥
+      if(Dragon.boost>0){
+        C.globalAlpha=0.08+0.04*Math.sin(frameCount*0.3);
+        C.fillStyle='#FFD700';
+        C.fillRect(0,0,W,H);
+        C.globalAlpha=1;
+      }
+    }
+    // 灞忓箷闇囧姩
+    if(shakeTimer>0){
+      shakeTimer--;
+      const sx=(Math.random()-0.5)*shakeTimer*2;
+      const sy=(Math.random()-0.5)*shakeTimer*2;
+      C.translate(sx,sy);
+      // 绾㈣壊闂儊
+      if(flashAlpha>0){
+        C.globalAlpha=flashAlpha;
+        C.fillStyle='#FF0000';C.fillRect(0,0,W,H);
+        flashAlpha-=0.05;
+        C.globalAlpha=1;
+      }
+    }
+  }
+};
+
+// ---- 杈撳叆 ----
+function onFlap(e){
+  e.preventDefault();
+  if(state===STATE.PLAYING) Dragon.flapUp();
+}
+Canvas.addEventListener('mousedown', onFlap);
+Canvas.addEventListener('touchstart', onFlap);
+document.addEventListener('keydown', e=>{if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();if(state===STATE.PLAYING)Dragon.flapUp();}});
+
+// ---- 涓诲惊鐜?----
+function loop(){
+  resize();
+  Game.update();
+  Game.draw();
+  requestAnimationFrame(loop);
+}
+
+// ---- 鍒濆鍖?----
+initStars();
+initClouds();
+document.getElementById('bestScore').textContent=best;
+document.getElementById('totalCoins').textContent=totalCoins;
+loop();
+</script>
+
+<!-- 鐗堟潈澹版槑 -->
+<div style="position:fixed;bottom:4px;right:8px;z-index:100;color:rgba(255,255,255,.15);font-size:10px;pointer-events:none">
+漏 2026 椋炲ぉ灏忛緳杞?- 100%鍘熷垱 | 鏃犱换浣曠涓夋柟IP/鍟嗘爣/绱犳潗
+</div>
+</body>
+</html>
